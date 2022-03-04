@@ -1,11 +1,26 @@
-const express = require('express');
-const parse = require('csv-parse');
-const sqlite3 = require('sqlite3');
-const cors = require('cors');
-const fs = require('fs');
-const {createCountryTable, createGoldMedalTable, goldMedalNumber, bestYear, mostSummerWins, mostWinterWins, bestDiscipline, bestSport, bestEvent, numberMenMedalists, numberWomenMedalists, mostMedaledAthlete, orderedMedals, orderedSports} = require('./sql');
+const express = require("express");
+const parse = require("csv-parse");
+const sqlite3 = require("sqlite3");
+const cors = require("cors");
+const fs = require("fs");
+const {
+  createCountryTable,
+  createGoldMedalTable,
+  goldMedalNumber,
+  bestYear,
+  mostSummerWins,
+  mostWinterWins,
+  bestDiscipline,
+  bestSport,
+  bestEvent,
+  numberMenMedalists,
+  numberWomenMedalists,
+  mostMedaledAthlete,
+  orderedMedals,
+  orderedSports,
+} = require("./sql");
 
-const db = new sqlite3.Database('./gold_medals.sqlite');
+const db = new sqlite3.Database("./gold_medals.sqlite");
 
 const app = express();
 app.use(cors());
@@ -14,7 +29,7 @@ const lowerCaseObjectKeys = (questionableKeys) => {
   // Valid SQL commands are case-insensitive, but JavaScript is case-sensitive
   let lowerCaseKeys = {};
   for (const prop in questionableKeys) {
-    if (prop.toLowerCase().indexOf('count') !== -1) {
+    if (prop.toLowerCase().indexOf("count") !== -1) {
       lowerCaseKeys.count = questionableKeys[prop];
     } else {
       lowerCaseKeys[prop.toLowerCase()] = questionableKeys[prop];
@@ -23,54 +38,64 @@ const lowerCaseObjectKeys = (questionableKeys) => {
   return lowerCaseKeys;
 };
 
-const fixCountryName = countryName => {
+const fixCountryName = (countryName) => {
   // Fixes case for country names
-  return countryName.replace(/\w\S*/g, txt => {return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+  return countryName.replace(/\w\S*/g, (txt) => {
+    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+  });
 };
 
-app.get('/country/:countryName', (req, res, next) => {
+app.get("/country/:countryName", (req, res, next) => {
   const countryName = fixCountryName(req.params.countryName);
 
   const goldMedalQuery = goldMedalNumber(countryName);
   const summerWinsQuery = mostSummerWins(countryName);
   const winterWinsQuery = mostWinterWins(countryName);
-  const disciplineQuery = bestDiscipline(countryName); 
+  const disciplineQuery = bestDiscipline(countryName);
   const sportQuery = bestSport(countryName);
   const eventQuery = bestEvent(countryName);
   const menMedalistsQuery = numberMenMedalists(countryName);
   const womenMedalistsQuery = numberWomenMedalists(countryName);
   const yearQuery = bestYear(countryName);
   const mostMedalsQuery = mostMedaledAthlete(countryName);
-  
-  let country = {'name': countryName};
+
+  let country = { name: countryName };
   db.serialize(() => {
     db.parallelize(() => {
       // Add population & gdp
-      db.get("SELECT * FROM Country WHERE name = $name", {$name: countryName}, (err, row) => {
-        if (err) {
-          console.log(`Error while finding country details for ${countryName}.`);
-          console.log(err);
+      db.get(
+        "SELECT * FROM Country WHERE name = $name",
+        { $name: countryName },
+        (err, row) => {
+          if (err) {
+            console.log(
+              `Error while finding country details for ${countryName}.`
+            );
+            console.log(err);
+          }
+          if (row) {
+            country.gdp = row.gdp;
+            country.population = row.population;
+          } else {
+            country.gdp = "-";
+            country.population = "-";
+          }
         }
-        if (row) {
-          country.gdp = row.gdp;
-          country.population = row.population;
-        } else {
-          country.gdp = '-';
-          country.population = '-';
-        }
-      });
+      );
 
       // Add # of gold medals
       db.get(goldMedalQuery, (err, row) => {
         if (err) {
-          console.log(`Error while finding number of gold medals for ${countryName}.`);
+          console.log(
+            `Error while finding number of gold medals for ${countryName}.`
+          );
           console.log(err);
         }
         if (row) {
           const lowerRow = lowerCaseObjectKeys(row);
           country.numberMedals = lowerRow.count;
         } else {
-          country.numberMedals = '-';
+          country.numberMedals = "-";
         }
       });
 
@@ -85,7 +110,7 @@ app.get('/country/:countryName', (req, res, next) => {
           const yearString = `${lowerRow.year} (${lowerRow.count} awards)`;
           country.bestYear = yearString;
         } else {
-          country.bestYear = '-';
+          country.bestYear = "-";
         }
       });
 
@@ -100,7 +125,7 @@ app.get('/country/:countryName', (req, res, next) => {
           const summerString = `${lowerRow.year} (${lowerRow.count} medals)`;
           country.bestSummer = summerString;
         } else {
-          country.bestSummer = '-';
+          country.bestSummer = "-";
         }
       });
 
@@ -115,14 +140,16 @@ app.get('/country/:countryName', (req, res, next) => {
           const winterString = `${lowerRow.year} (${lowerRow.count} medals)`;
           country.bestWinter = winterString;
         } else {
-          country.bestWinter = '-';
+          country.bestWinter = "-";
         }
       });
 
       // Add best discipline
       db.get(disciplineQuery, (err, row) => {
         if (err) {
-          console.log(`Error while finding best discipline for ${countryName}.`);
+          console.log(
+            `Error while finding best discipline for ${countryName}.`
+          );
           console.log(err);
         }
         if (row) {
@@ -130,7 +157,7 @@ app.get('/country/:countryName', (req, res, next) => {
           const disciplineString = `${lowerRow.discipline} (${lowerRow.count} medals)`;
           country.bestDiscipline = disciplineString;
         } else {
-          country.bestDiscipline = '-';
+          country.bestDiscipline = "-";
         }
       });
 
@@ -145,7 +172,7 @@ app.get('/country/:countryName', (req, res, next) => {
           const sportString = `${lowerRow.sport} (${lowerRow.count} medals)`;
           country.bestSport = sportString;
         } else {
-          country.bestSport = '-';
+          country.bestSport = "-";
         }
       });
 
@@ -160,7 +187,7 @@ app.get('/country/:countryName', (req, res, next) => {
           const eventString = `${lowerRow.event} (${lowerRow.count} medals)`;
           country.bestEvent = eventString;
         } else {
-          country.bestEvent = '-';
+          country.bestEvent = "-";
         }
       });
 
@@ -174,35 +201,39 @@ app.get('/country/:countryName', (req, res, next) => {
           const lowerRow = lowerCaseObjectKeys(row);
           country.maleMedalists = lowerRow.count;
         } else {
-          country.maleMedalists = '-';
+          country.maleMedalists = "-";
         }
       });
 
       // Add women medalists
       db.get(womenMedalistsQuery, (err, row) => {
         if (err) {
-          console.log(`Error while finding women medalists for ${countryName}.`);
+          console.log(
+            `Error while finding women medalists for ${countryName}.`
+          );
           console.log(err);
         }
         if (row) {
           const lowerRow = lowerCaseObjectKeys(row);
           country.femaleMedalists = lowerRow.count;
         } else {
-          country.femaleMedalists = '-';
+          country.femaleMedalists = "-";
         }
       });
 
       // Add most decorated
       db.get(mostMedalsQuery, (err, row) => {
         if (err) {
-          console.log(`Error while finding women medalists for ${countryName}.`);
+          console.log(
+            `Error while finding women medalists for ${countryName}.`
+          );
           console.log(err);
         }
         if (row) {
           const lowerRow = lowerCaseObjectKeys(row);
           country.mostMedalsAthlete = lowerRow.name;
         } else {
-          country.mostMedalsAthlete = '-';
+          country.mostMedalsAthlete = "-";
         }
       });
     });
@@ -212,20 +243,23 @@ app.get('/country/:countryName', (req, res, next) => {
   });
 });
 
-app.get('/country', (req, res, next) => {
+app.get("/country", (req, res, next) => {
   const sortBy = req.query.sort_by;
-  const isDescending = req.query.ascending === 'y';
+  const isDescending = req.query.ascending === "y";
   let dbQuery = "SELECT name, gdp, population FROM Country;";
-  if (['name', 'gdp', 'population'].includes(sortBy) && typeof req.query.ascending !== 'undefined') {
-    const direction = req.query.ascending === 'y' ? 'ASC' : 'DESC';
+  if (
+    ["name", "gdp", "population"].includes(sortBy) &&
+    typeof req.query.ascending !== "undefined"
+  ) {
+    const direction = req.query.ascending === "y" ? "ASC" : "DESC";
     const sortString = `ORDER BY ${sortBy} ${direction}`;
     dbQuery = `SELECT name,gdp, population FROM Country ${sortString};`;
   }
 
   db.all(dbQuery, (err, rows) => {
     db.serialize(() => {
-      rows.forEach(row => {
-        const escapedName = row.name.replace(/'/g, '\'\'');
+      rows.forEach((row) => {
+        const escapedName = row.name.replace(/'/g, "''");
         const getMedalsQuery = goldMedalNumber(escapedName);
         if (getMedalsQuery) {
           db.get(getMedalsQuery, (err, medalRow) => {
@@ -242,8 +276,11 @@ app.get('/country', (req, res, next) => {
         }
       });
       db.get("SELECT name FROM Country LIMIT 1;", (err, row) => {
-        if (sortBy === 'medalNumber' && typeof req.query.ascending !== 'undefined') {
-          if (req.query.ascending === 'y') {
+        if (
+          sortBy === "medalNumber" &&
+          typeof req.query.ascending !== "undefined"
+        ) {
+          if (req.query.ascending === "y") {
             rows.sort((countryA, countryB) => {
               return countryA.medals - countryB.medals;
             });
@@ -253,40 +290,40 @@ app.get('/country', (req, res, next) => {
             });
           }
         }
-        res.json({countries: rows});
+        res.json({ countries: rows });
       });
     });
   });
 });
 
-app.get('/country/:countryName/medals', (req, res, next) => {
+app.get("/country/:countryName/medals", (req, res, next) => {
   const countryName = fixCountryName(req.params.countryName);
   const sortBy = req.query.sort_by;
-  const isAscending = req.query.ascending === 'y';
+  const isAscending = req.query.ascending === "y";
 
   const orderedMedalQuery = orderedMedals(countryName, sortBy, isAscending);
   db.all(orderedMedalQuery, (err, rows) => {
     if (rows) {
-      res.json({'medals': rows});
+      res.json({ medals: rows });
     } else {
       res.json();
     }
   });
 });
 
-const transformSport = sport => {
+const transformSport = (sport) => {
   const loweredSport = lowerCaseObjectKeys(sport);
   return {
-    'sportName':      loweredSport.sport,
-    'numberMedals':   loweredSport.count,
-    'percentageWins': loweredSport.percent,
+    sportName: loweredSport.sport,
+    numberMedals: loweredSport.count,
+    percentageWins: loweredSport.percent,
   };
 };
 
-app.get('/country/:countryName/sports', (req, res, next) => {
+app.get("/country/:countryName/sports", (req, res, next) => {
   const countryName = fixCountryName(req.params.countryName);
   const sortBy = req.query.sort_by;
-  const isAscending = req.query.ascending === 'y';
+  const isAscending = req.query.ascending === "y";
 
   const sportsQuery = orderedSports(countryName, sortBy, isAscending);
   if (sportsQuery) {
@@ -299,7 +336,7 @@ app.get('/country/:countryName/sports', (req, res, next) => {
         rows.forEach((row, index, allRows) => {
           allRows[index] = transformSport(row);
         });
-        res.json({sports: rows});
+        res.json({ sports: rows });
       }
     });
   } else {
@@ -319,7 +356,7 @@ app.listen(3001, () => {
 
     // Create the country table
     if (createCountryQuery) {
-      db.run(createCountryQuery, err => {
+      db.run(createCountryQuery, (err) => {
         if (err) {
           console.log("Error while creating the Country table!");
           console.log(err);
@@ -330,7 +367,7 @@ app.listen(3001, () => {
 
     // Create the GoldMedal table
     if (createGoldMedalQuery) {
-      db.run(createGoldMedalQuery, err => {
+      db.run(createGoldMedalQuery, (err) => {
         if (err) {
           console.log("Error while creating the GoldMedal table!");
           console.log(err);
@@ -346,22 +383,26 @@ app.listen(3001, () => {
         console.log(err);
         return;
       } else {
-        fs.createReadStream('data/country.csv')
-        .pipe(parse({from: 2}))
-        .on('data', function(csvrow) {
-          db.run("INSERT INTO Country (name, code, population, gdp) VALUES ($name, $code, $population, $gdp)", {
-            $name: csvrow[0],
-            $code: csvrow[1],
-            $population: csvrow[2],
-            $gdp: csvrow[3]
-          }, (err) => {
-            if (err) {
-              console.log("Error while inserting Country data");
-              console.log(err);
-              return;
-            }
+        fs.createReadStream("data/country.csv")
+          .pipe(parse({ from: 2 }))
+          .on("data", function (csvrow) {
+            db.run(
+              "INSERT INTO Country (name, code, population, gdp) VALUES ($name, $code, $population, $gdp)",
+              {
+                $name: csvrow[0],
+                $code: csvrow[1],
+                $population: csvrow[2],
+                $gdp: csvrow[3],
+              },
+              (err) => {
+                if (err) {
+                  console.log("Error while inserting Country data");
+                  console.log(err);
+                  return;
+                }
+              }
+            );
           });
-        });
       }
     });
 
@@ -373,29 +414,33 @@ app.listen(3001, () => {
         return;
       } else {
         let idCounter = 1;
-        fs.createReadStream('data/goldmedal.csv')
-        .pipe(parse({from: 2}))
-        .on('data', function(csvrow) {
-          db.run("INSERT INTO GoldMedal (id, year, city, sport, discipline, name, country, gender, event, season) VALUES ($id, $year, $city, $sport, $discipline, $name, $country, $gender, $event, $season)", {
-            $id: idCounter,
-            $year: csvrow[0],
-            $city: csvrow[1],
-            $sport: csvrow[2],
-            $discipline: csvrow[3],
-            $name: csvrow[4],
-            $country: csvrow[5],
-            $gender: csvrow[6],
-            $event: csvrow[7],
-            $season: csvrow[8]
-          }, (err) => {
-            if (err) {
-              console.log("Error while inserting GoldMedal data");
-              console.log(err);
-              return;
-            }
+        fs.createReadStream("data/goldmedal.csv")
+          .pipe(parse({ from: 2 }))
+          .on("data", function (csvrow) {
+            db.run(
+              "INSERT INTO GoldMedal (id, year, city, sport, discipline, name, country, gender, event, season) VALUES ($id, $year, $city, $sport, $discipline, $name, $country, $gender, $event, $season)",
+              {
+                $id: idCounter,
+                $year: csvrow[0],
+                $city: csvrow[1],
+                $sport: csvrow[2],
+                $discipline: csvrow[3],
+                $name: csvrow[4],
+                $country: csvrow[5],
+                $gender: csvrow[6],
+                $event: csvrow[7],
+                $season: csvrow[8],
+              },
+              (err) => {
+                if (err) {
+                  console.log("Error while inserting GoldMedal data");
+                  console.log(err);
+                  return;
+                }
+              }
+            );
+            idCounter += 1;
           });
-          idCounter += 1;
-        });
       }
     });
     db.get("SELECT name FROM GoldMedal LIMIT 1;", (err, row) => {
